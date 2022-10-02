@@ -2,7 +2,7 @@ import  express  from "express";
 import cors from "cors";
 import dotenv from 'dotenv';
 import pkg  from 'pg';
-
+import dayjs from 'dayjs'
 dotenv.config();
 const app = express();
 app.use(cors());
@@ -46,7 +46,7 @@ app.post('/games', (req, res) => {
 })
 
 app.post('/customers', (req, res)=>{
-  console.log(req.body)
+   
   const { name, phone, cpf, birthday } = req.body
   connection.query(
     "INSERT INTO customers (name, phone, cpf, birthday) VALUES ($1,$2,$3,$4);",
@@ -64,28 +64,80 @@ app.get('/customers/:id', async (req, res)=>{
 })
 
 app.get('/customers', async (req, res)=>{
-  const customers = await connection.query('SELECT * FROM customers;');
-  res.send(customers.rows)
+  const customersList = await connection.query('SELECT * FROM customers;');
+  res.send(customersList.rows)
 })
 
 app.put('/customers/:id',  (req, res)=>{
-  try {
-    //inserir cliente no db pelo id
-    const  id  = req.body.id
-    const {cpf, name} = req.body
-console.log({name}) 
+    try {
+      const  {id}  = req.params
+      console.log(id) 
+      const {cpf, name} = req.body
+      console.log(cpf) 
+    connection.query(`UPDATE customers SET cpf=${cpf} WHERE id=${id};`
+      )
+      res.send(201) 
 
-   connection.query(`UPDATE customers SET cpf=${cpf} WHERE id=${id};`
-    )
-     
-    res.send(201) 
+    } catch (error) {
+      console.log(error)
+      return res.sendStatus(500)
+  }
+})
 
-} catch (error) {
-    console.log(error)
-    return res.sendStatus(500)
-}
+app.post('/rentals/:priceDay', (req, res) => {
+  const { customerId, gameId, daysRented } = req.body
+  const  priceDay  = req.params.priceDay
+  console.log(priceDay)
+  connection.query(
+`INSERT INTO rentals 
+    (
+      "customerId", 
+      "gameId", 
+      "rentDate", 
+      "daysRented", 
+      "returnDate", 
+      "originalPrice", 
+      "delayFee"
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7);`,
+    [
+      customerId,
+      gameId,
+      dayjs().format('YYYY-MM-DD'),
+      daysRented,
+      null,
+      priceDay * daysRented,
+      null
+    ]
+  );
+  res.send("ok")
+})
+
+app.get('/rentals', async (req, res)=>{
+  const rentalsList = await connection.query('SELECT * FROM rentals;');
+  res.send(rentalsList.rows)
+})
+
+app.post('/rentals/:id/return', async (req, res) => {
+  const  priceDay  = req.headers.priceDay
+  const { id } = req.params
+  let delayFee;
+
+  const customersList = await connection.query("SELECT * FROM rentals WHERE Id = $1;",[id]);
+   const teste = customersList.rows[0]
+   const { rentDate, daysRented, originalPrice} = teste
+   const isDelay = dayjs().diff(rentDate, 'day')
+   if(isDelay > daysRented) delayFee = isDelay - daysRented
+   else delayFee = 0
+   delayFee =  delayFee * originalPrice
+    
+   connection.query(` UPDATE rentals 
+   SET "returnDate" = $1, "delayFee" = $2
+   WHERE id = $3;`,[dayjs().format('YYYY-MM-DD'), delayFee, id])
+    
+   
+  res.send(customersList.rows[0])
+ 
   
-
 })
 
 
