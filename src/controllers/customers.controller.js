@@ -1,30 +1,16 @@
 import connection from "../database/db.js";
-import joi from 'joi';
-
-const nameValid = joi.object({
-  name: joi.string().required().min(1),
-  phone: joi.string().required().min(10).max(11),
-  cpf: joi.string().required().min(11).max(11),
-  birthday: joi.string().required()
-});
 
 async function postCustomers (req, res){
   const { name, phone, cpf, birthday } = req.body
-  const valiCadastro = nameValid.validate(req.body, {abortEarly: false})
-  if(valiCadastro.error){
-   const erro = valiCadastro.error.details.map((err) => err.message)
-    return res.status(422).send(erro)
-  }
-  const Consult = await connection.query('SELECT * FROM customers WHERE cpf = $1;',
-  [cpf])
-  if(Consult.rows.length) {
-    return res.send(409)
+  const Consult = await connection.query('SELECT * FROM customers WHERE cpf = $1;', [cpf]);
+  if(Consult.rows.length > 0) {
+    return res.sendStatus(409)
   }
   connection.query(
     "INSERT INTO customers (name, phone, cpf, birthday) VALUES ($1,$2,$3,$4);",
     [name, phone, cpf, birthday]
   );
-  res.send('ok')
+  return res.sendStatus(201)
 }
 
 async function getHumCustomers (req, res){
@@ -32,10 +18,10 @@ async function getHumCustomers (req, res){
   const customers = await connection.query('SELECT * FROM customers WHERE Id = $1;',
   [id]
   );
-  if(!customers.length){
-    return res.send(404)
+  if(!customers.rows.length){
+    return res.sendStatus(404)
   }
-  res.send(customers.rows[0])
+ return res.send(customers.rows[0])
 }
 
 async function getAllCustomers (req, res){
@@ -46,15 +32,11 @@ async function getAllCustomers (req, res){
 
  async function putCustomers (req, res){
   const {name, phone, cpf, birthday} = req.body
-  const valiCadastro = nameValid.validate(req.body, {abortEarly: false})
-  if(valiCadastro.error){
-   const erro = valiCadastro.error.details.map((err) => err.message)
-    return res.status(422).send(erro)
-  }
+  
   const Consult = await connection.query('SELECT * FROM customers WHERE cpf = $1;',
   [cpf])
   if(Consult.rows.length) {
-    return res.send(409)
+    return res.sendStatus(409)
   }
   
   try {
@@ -63,7 +45,6 @@ async function getAllCustomers (req, res){
     SET name = $1, phone = $2, cpf = $3, birthday = $4
     WHERE id = $5;`,[name, phone, cpf, birthday, id])
     res.send(201) 
-
   } catch (error) {
     console.log(error)
     return res.sendStatus(500)
